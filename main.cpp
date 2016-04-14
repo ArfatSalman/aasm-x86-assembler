@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <regex>
 #include <cctype>
-#include <map>
 #include <sstream>
+#include <map>
 
 using namespace std;
 
@@ -14,7 +14,7 @@ bool DEBUG = false;
 
 int err_exit(string msg="")
 {
-    cout<<msg<<"\n";
+    cout<<endl<<msg;
     exit(1);
 }
 
@@ -89,6 +89,11 @@ bool is_digits(const string &str)
     return str.find_first_not_of("0123456789") == string::npos;
 }
 
+bool is_hex(const string &str)
+{
+    return str.find_first_not_of("0123456789aAbBcCdDeEfF") == string::npos;
+}
+
 bool is_register(const string reg)
 {
     regex re("ah|al|bh|bl|ch|cl|dh|dl|ax|bx|cx|dx|bp|si|di|sp");
@@ -123,7 +128,7 @@ bool is_8(string reg)
     return false;
 }
 
-bool is_opcode(const string opc)
+bool is_mnemonic(const string opc)
 {
     regex re("mov|int|ret");
     smatch match;
@@ -186,89 +191,7 @@ public:
         err_exit("Error while fetching the values of Register.");
         return NULL;
     }
-};
-
-Reg reg;
-
-class Mnemonic {
-    string mnemonic;
-    short size;
-    string opcode;
-
-public:
-    Mnemonic(string mne, int s, string op)
-    {
-        mnemonic = mne;
-        size = s;
-        opcode = op;
-    }
-
-    short get_size()
-    {
-        return size;
-    }
-    string get_opcode()
-    {
-        return opcode;
-    }
-    void display()
-    {
-        cout<<mnemonic<<'\t'<<size<<'\t'<<opcode<<endl;
-    }
-};
-
-class MOT{
-    map<string, Mnemonic> coll;
-    map<string, Mnemonic>::iterator pos;
-
-public:
-    MOT()
-    {
-        coll.insert({"mov_reg_reg", Mnemonic("mov", 2, "100010")});
-        coll.insert({"mov_reg_imm8", Mnemonic("mov", 2, "10110")});
-        coll.insert({"mov_reg_imm16", Mnemonic("mov", 3, "10111")});
-        coll.insert({"mov_reg_mem", Mnemonic("mov", 4, "100010")});
-        coll.insert({"mov_acc_mem", Mnemonic("mov", 3, "101000")});
-        coll.insert({"int", Mnemonic("int", 2, "11001101")});
-        coll.insert({"ret", Mnemonic("ret", 1, "11000011")});
-    }
-
-    short get_size_of(string mnemomic)
-    {
-        pos = coll.find(mnemomic);
-        if (pos != coll.end())
-        {
-            Mnemonic temp = pos->second;
-            return temp.get_size();
-        }
-        err_exit("Can't find the OPCODE.");
-        return 0;
-    }
-
-    string get_opcode(string mnemomic)
-    {
-        pos = coll.find(mnemomic);
-        if (pos != coll.end())
-        {
-            Mnemonic temp = pos->second;
-            return temp.get_opcode();
-        }
-        err_exit("Can't find the OPCODE.");
-        return NULL;
-    }
-
-    void display()
-    {
-        for (pos = coll.begin(); pos != coll.end(); ++pos)
-        {
-            Mnemonic temp = pos->second;
-            temp.display();
-        }
-        return;
-    }
-};
-
-MOT mot; // GLOBAL definition
+} reg;
 
 class Symbol {
     string name;
@@ -288,15 +211,22 @@ public:
         section_id = sec;
         is_global = is_g;
     }
-    string get_type() {
+
+    string get_type()
+    {
         return type;
     }
-    short get_size() {
+
+    short get_size()
+    {
         return size;
     }
-    short get_loc(){
+
+    short get_loc()
+    {
         return location;
     }
+
     string getName()
     {
         return name;
@@ -333,7 +263,7 @@ public:
         pos = coll.find(label);
         if (pos != coll.end())
             return pos->second;
-        err_exit("Undefined label.");
+        err_exit("The label has not been defined yet.");
     }
 
     void display()
@@ -344,9 +274,177 @@ public:
             temp.display();
         }
     }
+} sym;
+
+class Mnemonic {
+    string mnemonic;
+    short size;
+    string opcode;
+
+public:
+    Mnemonic(string mne, int s, string op)
+    {
+        mnemonic = mne;
+        size = s;
+        opcode = op;
+    }
+
+    short get_size()
+    {
+        return size;
+    }
+    string get_opcode()
+    {
+        return opcode;
+    }
+    void display()
+    {
+        cout<<mnemonic<<'\t'<<size<<'\t'<<opcode<<endl;
+    }
 };
 
-SYMTAB sym; // GLOBAL Definition
+class MOT {
+    map<string, Mnemonic> coll;
+    map<string, Mnemonic>::iterator pos;
+
+public:
+    MOT()
+    {
+        coll.insert({"mov_reg_reg", Mnemonic("mov", 2, "100010")});
+        coll.insert({"mov_reg_imm8", Mnemonic("mov", 2, "1011")});
+        coll.insert({"mov_reg_imm16", Mnemonic("mov", 3, "1011")});
+        coll.insert({"mov_reg_mem", Mnemonic("mov", 4, "100010")});
+        coll.insert({"mov_acc_mem", Mnemonic("mov", 3, "101000")});
+        coll.insert({"int", Mnemonic("int", 2, "11001101")});
+        coll.insert({"ret", Mnemonic("ret", 1, "11000011")});
+        coll.insert({"lea", Mnemonic("lea", 3, "10001101")});
+    }
+
+    short get_size_of(string mnemomic)
+    {
+        pos = coll.find(mnemomic);
+        if (pos != coll.end())
+        {
+            Mnemonic temp = pos->second;
+            return temp.get_size();
+        }
+        err_exit("Can't find the OPCODE.");
+        return 0;
+    }
+
+    string get_opcode(string mnemomic)
+    {
+        pos = coll.find(mnemomic);
+        if (pos != coll.end())
+        {
+            Mnemonic temp = pos->second;
+            return temp.get_opcode();
+        }
+        err_exit("Can't find the OPCODE.");
+        return NULL;
+    }
+
+    void display()
+    {
+        for (pos = coll.begin(); pos != coll.end(); ++pos)
+        {
+            Mnemonic temp = pos->second;
+            temp.display();
+        }
+        return;
+    }
+} mot;
+
+class Error {
+    string line;
+
+public:
+    void set_line (string li)
+    {
+        line = li;
+    }
+
+    void prnt_err(string msg)
+    {
+        cout<<"\nIn line "<<line;
+        cout<<msg;
+        exit(1);
+    }
+
+    void reg_match(string reg1, string reg2)
+    {
+        if (is_register(reg1) && is_register(reg2))
+        {
+            if ((is_8(reg1) && !is_8(reg2)) || (!is_8(reg1) && is_8(reg2)) )
+            {
+                cout<<endl<<reg1<<" and "<<reg2<<"do not match in size.";
+                prnt_err("");
+            }
+        }
+        else
+        {
+            cout<<endl<<reg1<<" and "<<reg2<<"are not Intel recognized registers.\n";
+            exit(1);
+        }
+    }
+
+    void in_data(string datatype, string init)
+    {
+        if (datatype == "db")
+        {
+            if (init.find("'") == string::npos)
+            {
+                if (!is_hex(init.substr(0,init.length()-1)) || init.back() != 'h')
+                    prnt_err("The initializer type can't be ascertained. Put h for Hex values");
+
+            }
+            else
+                if (init.length() > 3)
+                    prnt_err("The initializer overflows the variable/register length. Use single character.");
+        }
+        else if (datatype == "dw")
+        {
+            if (init.find("\"") == string::npos)
+            {
+                 if (!is_hex(init.substr(0,init.length()-1)) || init.back() != 'h')
+                    prnt_err("The initializer is not an immediate data or it overflows the size of the variable.");
+                 else if (init.length() > 5 )
+                    prnt_err("The initializer overflows the variable/register length.");
+            }
+        }
+    }
+
+    void pseudo_directive(string label, string datatype, string init)
+    {
+        if (label == "")
+            prnt_err("Label cannot be Null or undefined.");
+        else if (is_register(label))
+            prnt_err("Label can't be the same as registers. Use different Label.");
+
+        in_data(datatype, init);
+    }
+
+    void in_instructions(string label, string mnemonic, string operand1, string operand2)
+    {
+        if (mnemonic == "ret")
+            return;
+        if (!is_mnemonic(mnemonic))
+            prnt_err("The Mnemonic is not recognized.");
+        else if (operand1 != "" && operand1.back() != ',')
+            prnt_err("Syntax Error: Use a comma after the first operand.");
+        else if (is_register(operand2))
+            reg_match(operand1, operand2);
+        else if (is_imm_data(operand2))
+        {
+            if (mnemonic == "int")
+                in_data("db", operand2);
+            if (is_8(operand1))
+                in_data("db", operand2);
+            else
+                in_data("dw", operand2);
+        }
+    }
+} err;
 
 string identify_opcode_type(string opcode, string operand1, string operand2)
 {
@@ -375,40 +473,64 @@ string identify_opcode_type(string opcode, string operand1, string operand2)
         return "int";
     else if (opcode == "ret")
         return "ret";
+    else if (opcode == "lea")
+        return "lea"
     else
         err_exit("OPCODE NOT DEFINED.");
     return NULL;
 }
 
-class Error {
-public:
-    bool reg_match(string reg1, string reg2)
+void fill_symbol_table(string var, string datatype, string init)
+{
+    if (DEBUG)
     {
-        if (is_register(reg1) && is_register(reg2))
-        {
-            if (is_8(reg1) && is_8(reg2))
-                return true;
-            else if (!is_8(reg1) && !is_8(reg2))
-                return true;
-            else
-            {
-                cout<<endl<<reg1<<" and "<<reg2<<"mismatch.\n";
-                exit(1);
-            }
-        }
-        else
-        {
-            cout<<endl<<reg1<<" and "<<reg2<<"are not recognized registers.\n";
-            exit(1);
-        }
-        return false;
+        cout<<"\nFilling Symbol Table with -  ";
+        cout<<"\nLabel: "<<var<<"\tData type: "<<datatype<<"\t Initializer: "<<init;
     }
-} err;
+
+    short size = 0;
+    if (datatype == "dw")
+    {
+        size = 2;
+        if (init.find("\"") != string::npos)
+        {
+            size = 0;
+            size += init.length() - 2; // Since there are 2 "'s
+        }
+    }
+    else if (datatype == "db")
+        size = 1;
+
+    Symbol temp(var, datatype, LC, size);
+    sym.insert(var,temp);
+    LC += size;
+}
+
+void fill_symbol_table(string label, string opcode, string operand1, string operand2)
+{
+    if (label != "")
+    {
+        label.pop_back(); // Removing : from the labels
+        Symbol temp(label, "Label", LC, 0);
+        sym.insert(label, temp);
+    }
+    if (opcode != "")
+    {
+        string str = identify_opcode_type(opcode, operand1, operand2);
+        LC = LC + mot.get_size_of(str);
+    }
+}
 
 class CodeGenerator{
     string CODE;
-    char w;
-    char d;
+    string opcode;
+    string w;
+    string d;
+    string oo;
+    string rrr;
+    string mmm;
+    string disp;
+    string imm_data;
     /*
      00 - if mmm = 110, a displacement follows the opcode; otherwise no displacement
      01 - An 8-bit signed disp follows the opcode
@@ -416,16 +538,53 @@ class CodeGenerator{
      11 - the mmm is a register instead of an addressing mode
      */
 public:
-    CodeGenerator()
-    {
-        CODE.clear();
-        w = '0';
-        d = '1';
-    }
 
-    void put_code()
+    void generate_code(string opcode, string d = "", string w = "", string oo = "", string rrr="",
+                       string mmm="", string imm_data = "", string disp="")
+                       {
+                           CODE.clear();
+
+                           string temp = opcode;
+
+                            if (d != "")
+                                temp += d;
+                            if (w != "")
+                                temp += w;
+                            if (oo != "");
+                                temp += oo;
+                            if (rrr != "")
+                                temp += rrr;
+                            if (mmm != "")
+                                temp += mmm;
+                           if (imm_data != "")
+                           {
+                                if (imm_data.find("'") != string::npos)
+                                    imm_data = short_to_hex(((char)imm_data.at(1)));
+                                else
+                                {
+                                    imm_data.pop_back(); // To remove h
+                                    imm_data = hexstr_to_str(imm_data);
+                                    if (imm_data.length() > 1)
+                                        swap(imm_data.at(0), imm_data.at(1));
+                                }
+                           }
+                            if (disp != "")
+                            {
+                                disp = hexstr_to_str(disp);
+                                swap(disp.at(0), disp.at(1));
+                            }
+
+                           temp = binstr_to_hexstr(temp);
+                           if (DEBUG)
+                               cout<<"\nThe generated hex is: "<<temp;
+                           temp = hexstr_to_str(temp) + disp + imm_data;
+                           CODE = temp;
+                           put_code();
+                       }
+
+    void put_code(string filename="a.com")
     {
-        ofstream obj_file("a.com", ios::binary|ios::app);
+        ofstream obj_file(filename, ios::binary|ios::app);
 
         if (!obj_file.is_open())
             err_exit("File can't be created.");
@@ -438,6 +597,20 @@ public:
         }
         obj_file.close();
     }
+    void lea(string type, string operand1, string operand2)
+    {
+        // Opcode - 10001101 oorrrmmm disp
+        if (is_8(operand1))
+            err.prnt_err("LEA cannot store data on 8 bit register.");
+
+        opcode = mot.get_opcode(type);
+        d = "", w = "", oo = "", rrr = "", mmm = "", imm_data = "";
+        Symbol label = sym.valid_label(operand2);
+
+        disp = short_to_hex(label.get_loc());
+
+        generate_code(opcode, d, w, oo, rrr, mmm, imm_data, disp);
+    }
 
     void mov_reg_mem(string type, string operand1, string operand2)
     {
@@ -449,25 +622,23 @@ public:
             exit(1);
         }
 
+        opcode = mot.get_opcode(type);
+        d = "1";
+        w = "0";
         if (!is_8(operand1))
-            w = '1';
+            w = "1";
+        oo = "00";
+        rrr = reg.get_reg_value(operand1);
+        mmm = "110";
         // Counting the displacement
-        string disp = hexstr_to_str('0'+short_to_hex(label.get_loc()));
-        if (disp.length() == 1)
-            disp = char(0x00) + disp;
-        swap(disp[0],disp[1]);
+        disp = short_to_hex(label.get_loc());
 
-        string str_bin = "";
-        // Opcode - 101000dw disp
+        // Opcode - 101000dw disp for ACC to mem
         // opcode - 100010dw oorrrmmm disp
         if (operand1 == "al" || operand1 == "ax")
-            str_bin = mot.get_opcode(type) + "0" + w;
+            generate_code(opcode, "0", w, "", "","","",disp);
         else
-            str_bin = mot.get_opcode(type) + d + w + "00" + reg.get_reg_value(operand1) + "110";
-
-        str_bin = hexstr_to_str(binstr_to_hexstr(str_bin));
-        CODE = str_bin + disp;
-        put_code();
+            generate_code(opcode, d, w, oo, rrr, mmm, "", disp);
     }
 
     void mov_acc_mem(string type, string operand1, string operand2)
@@ -477,123 +648,63 @@ public:
 
     void mov_reg_reg(string type, string operand1, string operand2)
     {
-        if (!err.reg_match(operand1, operand2))
-            return;
-
-        string opcode = mot.get_opcode(type);
-        d = '1';
-        w = '0';
-        if (!is_8(operand1))
-            w = '1';
-
         // OPCODE is - 100010dw oorrrmmm disp
-        CODE = opcode + d + w + "11" + reg.get_reg_value(operand1) + reg.get_reg_value(operand2);
+        opcode = mot.get_opcode(type);
+        d = "1";
+        w = "0";
+        if (!is_8(operand1))
+            w = "1";
+        oo = "11";
+        rrr = reg.get_reg_value(operand1);
+        mmm = reg.get_reg_value(operand2);
 
-        if (DEBUG)
-            cout<<endl<<CODE;
-
-        CODE = hexstr_to_str(binstr_to_hexstr(CODE));
-        put_code();
+        generate_code(opcode, d, w, oo, rrr, mmm);
         return;
     }
 
-    void mov_reg_imm8(string type, string operand1, string operand2)
+    void mov_reg_imm(string type, string operand1, string operand2)
     {
-        if (!is_register(operand1))
-            err_exit("Unidentified Register.");
-
-        if (!is_8(operand1))
-            err_exit("Use 8 bit registers.");
-
-        if (operand2.length() > 3)
-            err_exit("Data overflow on this register.");
-
-        string temp = "";
-
-        if (operand2.find("'") != string::npos)
-            temp = operand2.substr(1,operand2.length()-2); // Remove two 's
-        else
-        {
-            operand2.pop_back();
-            temp = hexstr_to_str(operand2);
-        }
-
         // Opcode 1011wrrr data ( of 1 or 2 bytes)
-        string str = mot.get_opcode(type) + reg.get_reg_value(operand1);
-        str = hexstr_to_str(binstr_to_hexstr(str));
-        CODE = str + temp;
-
-        if (DEBUG)
-            cout<<endl<<CODE;
-        put_code();
-
-    }
-
-    void mov_reg_imm16(string type, string operand1, string operand2)
-    {
-        // Opcode - 1011wrrr data ( 2 bytes)
-        if (!is_register(operand1))
-            err_exit("Unidentified Register.");
-        if (is_8(operand1))
-            err_exit("Use 16-bit registers. ");
-        if (operand2.length() > 5)
-            err_exit("Data overflow on this register.");
-
-        string temp = "";
-
-        if (operand2.find("'") != string::npos)
+        opcode = mot.get_opcode(type);
+        d = "";
+        w = "0";
+        if (!is_8(operand1))
         {
-            temp = operand2.substr(1,operand2.length()-2);
-            //Make temp of two bytes of it is of one byte
-            if (temp.length() == 1)
-                temp.push_back(char(0x00));
-            else
-                swap(temp[0], temp[1]); // because of Endianness
+            w = "1";
+            //Padding data for 2 bytes
+            unsigned len = operand2.length();
+            if (len == 2)
+                operand2 = "000" + operand2;
+            else if (len == 3)
+                operand2 = "00" + operand2;
+            else if (len == 4)
+                operand2 = "0" + operand2;
         }
-        else
-        {
-            operand2.pop_back();
-            temp = hexstr_to_str(operand2);
+        oo = "";
+        rrr = reg.get_reg_value(operand1);
+        mmm = "";
+        imm_data = operand2;
 
-            if (temp.length() == 1)
-                temp = temp + char(0x00);
-            else if (temp.length() == 2)
-                swap(temp[0], temp[1]);
-            // Because of Little Endianness
-                //char chr = temp.at(0);
-                //temp[0] = temp[1];
-                //temp[1] = chr;
-
-        }
-
-        string str = mot.get_opcode(type) + reg.get_reg_value(operand1);
-        str = hexstr_to_str(binstr_to_hexstr(str));
-        CODE = str + temp;
-
-        put_code();
+        generate_code(opcode, d, w, oo, rrr, mmm, imm_data);
     }
 
     void int_(string type, string operand1, string operand2)
     {
         // OPCODE - 11001101 type
-        if (operand2.find('h') == string::npos)
-            err_exit("Wrong parameter to INT.");
-
-        operand2.pop_back();
-        string temp = hexstr_to_str(operand2);
-
-        CODE = hexstr_to_str(binstr_to_hexstr(mot.get_opcode(type))) + temp;
+        opcode = mot.get_opcode(type);
+        d = "", w ="", oo = "", rrr="", mmm = "";
+        generate_code(opcode, d, w, oo, rrr, mmm, operand2);
         put_code();
     }
 
     void ret(string type, string operand1, string operand2)
     {
         if (operand1 != "" && operand2 != "")
-            return;
-        // OPCODE - 11000011
+            err_exit("ret does not take operands.");
 
-        CODE = hexstr_to_str(binstr_to_hexstr(mot.get_opcode(type)));
-        put_code();
+        // OPCODE - 11000011
+        opcode = mot.get_opcode(type);
+        generate_code(opcode);
     }
 
     void pseudo_opcode(string datatype, string val)
@@ -635,12 +746,7 @@ public:
                 if (CODE.length() == 1)
                     CODE = CODE + char(0x00);
                 else if (CODE.length() == 2)
-                    swap(CODE[0], CODE[1]);
-                //int temp = (int) strtol(val.c_str(),NULL,16);
-                //string temp_str((char*)&temp, 2);
-                //if (DEBUG)
-                    //cout<<endl<<temp_str;
-                //CODE = temp_str;
+                    swap(CODE.at(0), CODE.at(1));
             }
         }
         else
@@ -655,9 +761,9 @@ public:
         if (type == "mov_reg_reg")
             mov_reg_reg(type, operand1, operand2);
         else if (type == "mov_reg_imm8")
-            mov_reg_imm8(type, operand1, operand2);
+            mov_reg_imm(type, operand1, operand2);
         else if (type == "mov_reg_imm16")
-            mov_reg_imm16(type, operand1, operand2);
+            mov_reg_imm(type, operand1, operand2);
         else if (type == "mov_reg_mem")
             mov_reg_mem(type, operand1, operand2);
         else if (type == "mov_acc_mem")
@@ -666,119 +772,100 @@ public:
             int_(type, operand1, operand2);
         else if (type == "ret")
             ret(type, operand1, operand2);
+        else if (type == "lea");
+            lea(type, operand1, operand2);
         else
             err_exit("Instructions: Can't map instructions");
     }
 
-};
+} gen;
 
-CodeGenerator gen;
-
-void fill_symbol_table(string var, string datatype, string init)
+void parse_line(const string line, int pass = 1)
 {
-    if (DEBUG)
-    {
-        cout<<"fill_symbol_table: \n";
-        cout<<var<<'\t'<<datatype<<'\t'<<init<<endl; // DEBUG
-    }
-
-    short size = 0;
-
-    if (datatype == "dw")
-    {
-        size = 2;
-        if (init.find("\"") != string::npos)
-        {
-            size = 0;
-            size += init.length() - 2; // Since there are 2 "'s
-        }
-    }
-    else if (datatype == "db")
-        size = 1;
-
-    Symbol temp(var, datatype, LC, size);
-    sym.insert(var,temp);
-    LC += size;
-}
-
-void fill_symbol_table(string label, string opcode, string operand1, string operand2)
-{
-    if (label != "")
-    {
-        Symbol temp(label, "Label", LC, 0);
-        sym.insert(label, temp);
-    }
-    if (opcode != "")
-    {
-        string str = identify_opcode_type(opcode, operand1, operand2);
-        LC = LC + mot.get_size_of(str);
-    }
-
-    return;
-}
-
-int parse_line(const string line, int pass = 1)
-{
-    //string line= "mov ax, 05\n";
     string label = "";
-    string opcode = "";
+    string mnemonic = "";
     string operand1 = "";
     string operand2 = "";
 
     regex re("dw|db");
-    regex re_ins("\\s*([a-zA-Z0-9]+:)?\\s*([a-z]{3})?\\s+([a-z]+)?\\s*(,)?\\s*((')?[a-zA-Z0-9]+(')?|[0-9]+)?\\s*");
-    regex re_pot("\\s*([a-zA-Z0-9]+)\\s*(db|dw)\\s*((\"|\')?([a-zA-Z0-9 $]+)(\"|\')?)\\s*");
+    regex re_blank("^\\s*$");
+    regex re_label("^\\s*([a-zA-Z0-9]+:)\\s*$");
+    regex re_ins("^\\s*([a-zA-Z0-9]+:)?\\s*([a-z]{3})\\s+([a-z]+,)?\\s*((')?[a-zA-Z0-9]+(')?|[0-9]+)?\\s*$");
+    regex re_pot("^\\s*([a-zA-Z0-9]+)\\s*(db|dw)\\s*((\"|\')?([a-zA-Z0-9 $]+)(\"|\')?)\\s*");
 
     smatch match;
 
     try
     {
+        if (DEBUG)
+        {
+            cout<<"\nWhile parsing the line: "<<line;
+            cout<<"\nThese parameters were found - ";
+        }
+        if (regex_search(line, match, re_blank))
+            return;
+        if (regex_search(line, match, re_label))
+            fill_symbol_table(match[1],"","","");
         if (regex_search(line, match, re))
         {
             // Matched a Pseudo Directive
             if (regex_search(line, match, re_pot))
             {
+                err.set_line(line);
+                if (DEBUG)
+                    cout<<"\nLabel - "<<match[1]<<"\tdatatype - "<<match[2]<<" and initializer - "<<match[3];
                 if (pass == 1)
-                {
-                    //bool is_str = false;
-                    //if (match[3] == "\"")
-                        //is_str = true;
                     fill_symbol_table(match[1], match[2], match[3]);
-                }
                 else
                 {
-                    cout<<match[2]<<endl<<match[3];
+                    err.pseudo_directive(match[1], match[2], match[3]);
                     gen.pseudo_opcode(match[2], match[3]);
                 }
             }
             else
-                err_exit("Reg POT mismatch.");
+            {
+                cout<<endl<<line<<" can't be properly matched to known data types. Program will exit ...";
+                err_exit();
+            }
         }
         else
         {
             if (regex_search(line, match, re_ins))
             {
+                err.set_line(line);
                 label = match[1];
-                if (label != "")
-                    label.pop_back(); // Removes the last character
-                opcode = match[2];
+                mnemonic = match[2];
                 operand1 = match[3];
-                operand2 = match[5];
+                operand2 = match[4];
+
                 if (DEBUG)
-                    cout<<label<<'\t'<<opcode<<'\t'<<operand1<<'\t'<<operand2<<endl;
+                    cout<<"\nLabel: "<<label<<"\tMnemonic: "<<mnemonic<<"\tOp1: "<<operand1<<"\tOp2: "<<operand2;
                 if (pass == 1)
-                    fill_symbol_table(label, opcode, operand1, operand2);
+                {
+                    if (operand1 != "")
+                        operand1.pop_back(); // To remove the , from first operand
+                    fill_symbol_table(label, mnemonic, operand1, operand2);
+                }
                 else
-                    gen.instructions(label, opcode, operand1, operand2);
+                {
+                    err.in_instructions(label, mnemonic, operand1, operand2);
+                    if (operand1 != "")
+                        operand1.pop_back(); // To remove the , from first operand
+                    gen.instructions(label, mnemonic, operand1, operand2);
+                }
             }
             else
-                err_exit("Reg INSTR mismatch.");
+            {
+                cout<<endl<<line<<" can't be tokenized under the current system. Please make sure to use";
+                cout<<"\nIntel specified Mnemonics and operands. Program will exit ...";
+                err_exit();
+            }
         }
     } catch (regex_error &e)
     {
         err_exit("Regex Error. Quitting ...");
     }
-    return 0;
+    return;
 }
 
 int pass_1(string filename)
@@ -792,9 +879,9 @@ int pass_1(string filename)
     {
         while(getline(asm_file,line))
         {
-            //if (DEBUG)
+            if (DEBUG)
                 cout<<"Line to be parsed is: "<<line<<endl;
-            if (line == "\n")
+            if (line == "\n" || line == "")
                 continue;
             line = line+"\n";
             parse_line(line);
@@ -808,6 +895,9 @@ void pass_2(string filename)
 {
     LC = 0;
     string line;
+    //Removing the previous file if it exist.
+    if (ifstream("a.com"))
+        remove("a.com");
 
     ifstream asm_file(filename);
     if (!asm_file.is_open())
@@ -816,7 +906,7 @@ void pass_2(string filename)
     {
         while(getline(asm_file,line))
         {
-            //if (DEBUG)
+            if (DEBUG)
                 cout<<"Line to be converted is: "<<line<<endl;
             if (line == "\n" || line ==" " || line=="")
                 continue;
@@ -825,10 +915,12 @@ void pass_2(string filename)
     }
     asm_file.close();
 }
-#include<bitset>
+
 int main()
 {
-    cout<<bit.to_string();
+    pass_1("a.asm");
+    sym.display();
+    pass_2("a.asm");
     system("pause");
 }
 
