@@ -130,7 +130,7 @@ bool is_8(string reg)
 
 bool is_mnemonic(const string opc)
 {
-    regex re("mov|int|ret");
+    regex re("mov|int|ret|lea|jmp");
     smatch match;
     try
     {
@@ -317,7 +317,8 @@ public:
         coll.insert({"mov_acc_mem", Mnemonic("mov", 3, "101000")});
         coll.insert({"int", Mnemonic("int", 2, "11001101")});
         coll.insert({"ret", Mnemonic("ret", 1, "11000011")});
-        coll.insert({"lea", Mnemonic("lea", 3, "10001101")});
+        coll.insert({"lea", Mnemonic("lea", 3, "1011")});
+        coll.insert({"jmp", Mnemonic("jmp", 2, "11101011")});
     }
 
     short get_size_of(string mnemomic)
@@ -388,6 +389,19 @@ public:
         }
     }
 
+    void in_label(string reg, string var)
+    {
+        Symbol label = sym.valid_label(var);
+        if (is_8(reg))
+        {
+            if (label.get_type() == "dw")
+                prnt_err("The data variable overflows the register.");
+        }
+        else
+            if (label.get_type() == "db")
+                prnt_err("The data variable overflows the register.");
+    }
+
     void in_data(string datatype, string init)
     {
         if (datatype == "db")
@@ -429,7 +443,7 @@ public:
         if (mnemonic == "ret")
             return;
         if (!is_mnemonic(mnemonic))
-            prnt_err("The Mnemonic is not recognized.");
+            prnt_err("Error: The Mnemonic is not recognized.");
         else if (operand1 != "" && operand1.back() != ',')
             prnt_err("Syntax Error: Use a comma after the first operand.");
         else if (is_register(operand2))
@@ -443,6 +457,8 @@ public:
             else
                 in_data("dw", operand2);
         }
+        else
+            in_label(operand1, operand2);
     }
 } err;
 
@@ -474,9 +490,11 @@ string identify_opcode_type(string opcode, string operand1, string operand2)
     else if (opcode == "ret")
         return "ret";
     else if (opcode == "lea")
-        return "lea"
+        return "lea";
+    else if (opcode == "jmp")
+        return "jmp";
     else
-        err_exit("OPCODE NOT DEFINED.");
+        err.prnt_err("The mnemonic is not recognized.");
     return NULL;
 }
 
@@ -600,16 +618,30 @@ public:
     void lea(string type, string operand1, string operand2)
     {
         // Opcode - 10001101 oorrrmmm disp
+        // Opcode in emu8086 - 1011
         if (is_8(operand1))
             err.prnt_err("LEA cannot store data on 8 bit register.");
 
         opcode = mot.get_opcode(type);
-        d = "", w = "", oo = "", rrr = "", mmm = "", imm_data = "";
+        d = "", w = "1", oo = "";
+        rrr = reg.get_reg_value(operand1);
+        mmm = "", imm_data = "";
         Symbol label = sym.valid_label(operand2);
 
         disp = short_to_hex(label.get_loc());
 
         generate_code(opcode, d, w, oo, rrr, mmm, imm_data, disp);
+    }
+
+    void jmp(string type, string operand1, string operand2)
+    {
+        //Opcode - 11101001 disp (Near Jump)
+        Symbol label = sym.valid_label(operand2);
+        opcode = mot.get_opcode(type);
+        short distance = LC - label.get_loc();
+        disp = short_to_hex(distance);
+        cout<<"distance"<<distance<<endl;
+        cout<<disp;
     }
 
     void mov_reg_mem(string type, string operand1, string operand2)
@@ -709,6 +741,8 @@ public:
 
     void pseudo_opcode(string datatype, string val)
     {
+        short size = 0;
+
         if (DEBUG == true)
         {
             cout<<"\nCodeGenerator->pseudo_opcode: \n";
@@ -717,6 +751,7 @@ public:
 
         if (datatype == "db")
         {
+            size = 1;
             if (val.find("'") != string::npos)
                 CODE += val.substr(1,val.length()-2);
             else
@@ -730,11 +765,12 @@ public:
         }
         else if (datatype == "dw")
         {
+            size = 2;
             if (val.find("\"") != string::npos)
             {
                 // Because we are removing two chars("")
-                char ending = 0x00;
-                CODE += (val.substr(1,val.length()-2)+ending);
+                size = val.length() - 2;
+                CODE += (val.substr(1,val.length()-2));
             }
             else if (val.length() > 5)
                 err_exit("DW can only take 2 bytes.");
@@ -751,13 +787,14 @@ public:
         }
         else
             err_exit("Unidentified data type.");
-
+        LC += size;
         put_code();
     }
 
     void instructions(string label, string opcode, string operand1, string operand2)
     {
         string type = identify_opcode_type(opcode, operand1, operand2);
+        LC += mot.get_size_of(type);
         if (type == "mov_reg_reg")
             mov_reg_reg(type, operand1, operand2);
         else if (type == "mov_reg_imm8")
@@ -772,8 +809,10 @@ public:
             int_(type, operand1, operand2);
         else if (type == "ret")
             ret(type, operand1, operand2);
-        else if (type == "lea");
+        else if (type == "lea")
             lea(type, operand1, operand2);
+        else if (type == "jmp")
+            jmp(type, operand1, operand2);
         else
             err_exit("Instructions: Can't map instructions");
     }
@@ -805,7 +844,12 @@ void parse_line(const string line, int pass = 1)
         if (regex_search(line, match, re_blank))
             return;
         if (regex_search(line, match, re_label))
-            fill_symbol_table(match[1],"","","");
+        {
+            if (pass == 1)
+                fill_symbol_table(match[1],"","","");
+            return;
+        }
+
         if (regex_search(line, match, re))
         {
             // Matched a Pseudo Directive
@@ -910,7 +954,8 @@ void pass_2(string filename)
                 cout<<"Line to be converted is: "<<line<<endl;
             if (line == "\n" || line ==" " || line=="")
                 continue;
-            parse_line((line+"\n"), 2);
+            line += "\n";
+            parse_line(line, 2);
         }
     }
     asm_file.close();
