@@ -156,43 +156,6 @@ bool is_imm_data(const string data)
     return false;
 }
 
-class Reg {
-    map<string, string> coll;
-    map<string, string>::iterator pos;
-
-public:
-    Reg()
-    {
-        coll.insert({"al", "000"});
-        coll.insert({"ax", "000"});
-        coll.insert({"cl", "001"});
-        coll.insert({"cx", "001"});
-        coll.insert({"dl", "010"});
-        coll.insert({"dx", "010"});
-        coll.insert({"bl", "011"});
-        coll.insert({"bx", "011"});
-        coll.insert({"ah", "100"});
-        coll.insert({"sp", "100"});
-        coll.insert({"ch", "101"});
-        coll.insert({"bp", "101"});
-        coll.insert({"dh", "110"});
-        coll.insert({"si", "110"});
-        coll.insert({"bh", "111"});
-        coll.insert({"di", "111"});
-    }
-
-    string get_reg_value(string reg)
-    {
-        pos = coll.find(reg);
-        if (pos != coll.end())
-        {
-            return pos->second;
-        }
-        err_exit("Error while fetching the values of Register.");
-        return NULL;
-    }
-} reg;
-
 class Symbol {
     string name;
     string type; // Such as Variable, Label, etc.
@@ -275,86 +238,6 @@ public:
         }
     }
 } sym;
-
-class Mnemonic {
-    string mnemonic;
-    short size;
-    string opcode;
-
-public:
-    Mnemonic(string mne, int s, string op)
-    {
-        mnemonic = mne;
-        size = s;
-        opcode = op;
-    }
-
-    short get_size()
-    {
-        return size;
-    }
-    string get_opcode()
-    {
-        return opcode;
-    }
-    void display()
-    {
-        cout<<mnemonic<<'\t'<<size<<'\t'<<opcode<<endl;
-    }
-};
-
-class MOT {
-    map<string, Mnemonic> coll;
-    map<string, Mnemonic>::iterator pos;
-
-public:
-    MOT()
-    {
-        coll.insert({"mov_reg_reg", Mnemonic("mov", 2, "100010")});
-        coll.insert({"mov_reg_imm8", Mnemonic("mov", 2, "1011")});
-        coll.insert({"mov_reg_imm16", Mnemonic("mov", 3, "1011")});
-        coll.insert({"mov_reg_mem", Mnemonic("mov", 4, "100010")});
-        coll.insert({"mov_acc_mem", Mnemonic("mov", 3, "101000")});
-        coll.insert({"int", Mnemonic("int", 2, "11001101")});
-        coll.insert({"ret", Mnemonic("ret", 1, "11000011")});
-        coll.insert({"lea", Mnemonic("lea", 3, "1011")});
-        coll.insert({"jmp", Mnemonic("jmp", 2, "11101011")});
-    }
-
-    short get_size_of(string mnemomic)
-    {
-        pos = coll.find(mnemomic);
-        if (pos != coll.end())
-        {
-            Mnemonic temp = pos->second;
-            return temp.get_size();
-        }
-        err_exit("Can't find the OPCODE.");
-        return 0;
-    }
-
-    string get_opcode(string mnemomic)
-    {
-        pos = coll.find(mnemomic);
-        if (pos != coll.end())
-        {
-            Mnemonic temp = pos->second;
-            return temp.get_opcode();
-        }
-        err_exit("Can't find the OPCODE.");
-        return NULL;
-    }
-
-    void display()
-    {
-        for (pos = coll.begin(); pos != coll.end(); ++pos)
-        {
-            Mnemonic temp = pos->second;
-            temp.display();
-        }
-        return;
-    }
-} mot;
 
 class Error {
     string line;
@@ -461,6 +344,123 @@ public:
             in_label(operand1, operand2);
     }
 } err;
+
+class Reg {
+    map<string, string> coll;
+    map<string, string>::iterator pos;
+
+public:
+    Reg()
+    {
+        coll.insert({"al", "000"});
+        coll.insert({"ax", "000"});
+        coll.insert({"cl", "001"});
+        coll.insert({"cx", "001"});
+        coll.insert({"dl", "010"});
+        coll.insert({"dx", "010"});
+        coll.insert({"bl", "011"});
+        coll.insert({"bx", "011"});
+        coll.insert({"ah", "100"});
+        coll.insert({"sp", "100"});
+        coll.insert({"ch", "101"});
+        coll.insert({"bp", "101"});
+        coll.insert({"dh", "110"});
+        coll.insert({"si", "110"});
+        coll.insert({"bh", "111"});
+        coll.insert({"di", "111"});
+    }
+
+    string get_reg_value(string reg)
+    {
+        pos = coll.find(reg);
+        if (pos != coll.end())
+        {
+            return pos->second;
+        }
+        err.prnt_err("Error while fetching the values of Register.");
+        return NULL;
+    }
+} reg;
+
+class Mnemonic {
+    string mnemonic;
+    short size;
+    string opcode;
+
+public:
+    Mnemonic(string mne, int s, string op)
+    {
+        mnemonic = mne;
+        size = s;
+        opcode = op;
+    }
+
+    short get_size()
+    {
+        return size;
+    }
+    string get_opcode()
+    {
+        return opcode;
+    }
+    void display()
+    {
+        cout<<mnemonic<<'\t'<<size<<'\t'<<opcode<<endl;
+    }
+};
+
+class MOT {
+    map<string, Mnemonic> coll;
+    map<string, Mnemonic>::iterator pos;
+
+public:
+    MOT()
+    {
+        coll.insert({"mov_reg_reg", Mnemonic("mov", 2, "100010")});
+        coll.insert({"mov_reg_imm8", Mnemonic("mov", 2, "1011")});
+        coll.insert({"mov_reg_imm16", Mnemonic("mov", 3, "1011")});
+        coll.insert({"mov_reg_mem", Mnemonic("mov", 4, "100010")});
+        coll.insert({"mov_acc_mem", Mnemonic("mov", 3, "101000")});
+        coll.insert({"int", Mnemonic("int", 2, "11001101")});
+        coll.insert({"ret", Mnemonic("ret", 1, "11000011")});
+        coll.insert({"lea", Mnemonic("lea", 3, "1011")});
+        coll.insert({"jmp", Mnemonic("jmp", 2, "11101011")});
+    }
+
+    short get_size_of(string mnemomic)
+    {
+        pos = coll.find(mnemomic);
+        if (pos != coll.end())
+        {
+            Mnemonic temp = pos->second;
+            return temp.get_size();
+        }
+        err_exit("Can't find the OPCODE.");
+        return 0;
+    }
+
+    string get_opcode(string mnemomic)
+    {
+        pos = coll.find(mnemomic);
+        if (pos != coll.end())
+        {
+            Mnemonic temp = pos->second;
+            return temp.get_opcode();
+        }
+        err_exit("Can't find the OPCODE.");
+        return NULL;
+    }
+
+    void display()
+    {
+        for (pos = coll.begin(); pos != coll.end(); ++pos)
+        {
+            Mnemonic temp = pos->second;
+            temp.display();
+        }
+        return;
+    }
+} mot;
 
 string identify_opcode_type(string opcode, string operand1, string operand2)
 {
@@ -589,7 +589,8 @@ public:
                             if (disp != "")
                             {
                                 disp = hexstr_to_str(disp);
-                                swap(disp.at(0), disp.at(1));
+                                if (disp.length() > 1)
+                                    swap(disp.at(0), disp.at(1));
                             }
 
                            temp = binstr_to_hexstr(temp);
@@ -635,13 +636,16 @@ public:
 
     void jmp(string type, string operand1, string operand2)
     {
-        //Opcode - 11101001 disp (Near Jump)
+        //Opcode - 11101011 disp (Short Jump)
         Symbol label = sym.valid_label(operand2);
         opcode = mot.get_opcode(type);
-        short distance = LC - label.get_loc();
+        d = "", w = "", oo = "", rrr="", mmm = "", imm_data="";
+        short distance = label.get_loc() - LC;
         disp = short_to_hex(distance);
-        cout<<"distance"<<distance<<endl;
-        cout<<disp;
+        if (distance < 0)
+            disp = disp.substr(2,2); // for extractin fa in fffa
+
+        generate_code(opcode, d, w, oo, rrr, mmm, imm_data, disp);
     }
 
     void mov_reg_mem(string type, string operand1, string operand2)
@@ -937,7 +941,7 @@ int pass_1(string filename)
 
 void pass_2(string filename)
 {
-    LC = 0;
+    LC = 0x0100;
     string line;
     //Removing the previous file if it exist.
     if (ifstream("a.com"))
@@ -961,10 +965,9 @@ void pass_2(string filename)
     asm_file.close();
 }
 
-int main()
+int main(int argc, int **argv)
 {
     pass_1("a.asm");
-    sym.display();
     pass_2("a.asm");
     system("pause");
 }
