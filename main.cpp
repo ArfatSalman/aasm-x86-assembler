@@ -130,7 +130,7 @@ bool is_8(string reg)
 
 bool is_mnemonic(const string opc)
 {
-    regex re("mov|int|ret|lea|jmp");
+    regex re("mov|int|ret|lea|jmp|add|and|cmp|jz|je|jne|jnz|inc");
     smatch match;
     try
     {
@@ -154,6 +154,29 @@ bool is_imm_data(const string data)
     else if (data.at(data.length()-1) == 'h')
         return true;
     return false;
+}
+
+string padd_data_upto(string data, short bytes = 2)
+{
+    if (data.back() != 'h')
+        return data;
+
+    unsigned len = data.length();
+    if (bytes == 1)
+    {
+        if (1 == len)
+            data = "0" + data;
+    }
+    else if (bytes == 2)
+    {
+        if (len == 2)
+            data = "000" + data;
+        else if (len == 3)
+            data = "00" + data;
+        else if (len == 4)
+            data = "0" + data;
+    }
+    return data;
 }
 
 class Symbol {
@@ -252,6 +275,10 @@ public:
     {
         cout<<"\nIn line "<<line;
         cout<<msg;
+
+        if (ifstream("a.com"))
+            remove("a.com");
+
         exit(1);
     }
 
@@ -261,13 +288,13 @@ public:
         {
             if ((is_8(reg1) && !is_8(reg2)) || (!is_8(reg1) && is_8(reg2)) )
             {
-                cout<<endl<<reg1<<" and "<<reg2<<"do not match in size.";
+                cout<<endl<<reg1<<" and "<<reg2<<" do not match in size.";
                 prnt_err("");
             }
         }
         else
         {
-            cout<<endl<<reg1<<" and "<<reg2<<"are not Intel recognized registers.\n";
+            cout<<endl<<reg1<<" and "<<reg2<<" are not Intel recognized registers.\n";
             exit(1);
         }
     }
@@ -325,7 +352,12 @@ public:
     {
         if (mnemonic == "ret")
             return;
-        if (!is_mnemonic(mnemonic))
+        else if (mnemonic == "inc")
+        {
+             if (!is_register(operand2))
+                prnt_err("INC needs a register to increment.");
+        }
+        else if (!is_mnemonic(mnemonic))
             prnt_err("Error: The Mnemonic is not recognized.");
         else if (operand1 != "" && operand1.back() != ',')
             prnt_err("Syntax Error: Use a comma after the first operand.");
@@ -421,10 +453,29 @@ public:
         coll.insert({"mov_reg_imm16", Mnemonic("mov", 3, "1011")});
         coll.insert({"mov_reg_mem", Mnemonic("mov", 4, "100010")});
         coll.insert({"mov_acc_mem", Mnemonic("mov", 3, "101000")});
+
         coll.insert({"int", Mnemonic("int", 2, "11001101")});
         coll.insert({"ret", Mnemonic("ret", 1, "11000011")});
         coll.insert({"lea", Mnemonic("lea", 3, "1011")});
         coll.insert({"jmp", Mnemonic("jmp", 2, "11101011")});
+        coll.insert({"and", Mnemonic("and", 2, "001000")});
+
+        coll.insert({"add_reg_reg", Mnemonic("add", 2, "000000")});
+        coll.insert({"add_reg_imm8", Mnemonic("add", 3, "000000")});
+        coll.insert({"add_reg_imm16", Mnemonic("add", 4, "000000")});
+
+        coll.insert({"je",Mnemonic("je", 2, "01110100")});
+        coll.insert({"jz",Mnemonic("jz", 2, "01110100")});
+        coll.insert({"jne",Mnemonic("jne", 2, "01110101")});
+        coll.insert({"jnz",Mnemonic("jnz", 2, "01110101")});
+
+        coll.insert({"cmp_reg_reg", Mnemonic("cmp", 2, "001110")});
+        coll.insert({"cmp_reg_imm8", Mnemonic("cmp", 3, "100000")});
+        coll.insert({"cmp_reg_imm16", Mnemonic("cmp", 4, "100000")});
+        coll.insert({"cmp_acc_imm8", Mnemonic("cmp", 2, "0011110")});
+        coll.insert({"cmp_acc_imm16", Mnemonic("cmp", 3, "0011110")});
+
+        coll.insert({"inc", Mnemonic("inc", 2, "1111111")});
     }
 
     short get_size_of(string mnemomic)
@@ -435,7 +486,7 @@ public:
             Mnemonic temp = pos->second;
             return temp.get_size();
         }
-        err_exit("Can't find the OPCODE.");
+        err.prnt_err("Can't find the OPCODE.");
         return 0;
     }
 
@@ -493,6 +544,41 @@ string identify_opcode_type(string opcode, string operand1, string operand2)
         return "lea";
     else if (opcode == "jmp")
         return "jmp";
+    else if (opcode == "and")
+        return "and";
+    else if (opcode == "add")
+    {
+        if (is_register(operand1))
+        {
+            if (is_register(operand2))
+                return "add_reg_reg";
+        }
+    }
+    else if (opcode == "cmp")
+    {
+        if (is_register(operand1))
+        {
+            if (is_register(operand2))
+                return "cmp_reg_reg";
+            else if (is_imm_data(operand2))
+            {
+                if (operand1 == "al")
+                    return "cmp_acc_imm8";
+                else if (operand1 == "ax")
+                    return "cmp_acc_imm16";
+                if (is_8(operand1))
+                    return "cmp_reg_imm8";
+                else
+                    return "cmp_reg_imm16";
+            }
+        }
+    }
+    else if (opcode == "je" || opcode == "je")
+        return opcode;
+    else if (opcode == "jne" || opcode == "jne")
+        return opcode;
+    else if (opcode == "inc")
+        return opcode;
     else
         err.prnt_err("The mnemonic is not recognized.");
     return NULL;
@@ -577,7 +663,7 @@ public:
                            if (imm_data != "")
                            {
                                 if (imm_data.find("'") != string::npos)
-                                    imm_data = short_to_hex(((char)imm_data.at(1)));
+                                    imm_data = hexstr_to_str(short_to_hex(((char)imm_data.at(1))));
                                 else
                                 {
                                     imm_data.pop_back(); // To remove h
@@ -600,6 +686,88 @@ public:
                            CODE = temp;
                            put_code();
                        }
+    void inc(string type, string operand1, string operand2)
+    {
+        // Opcode - 1111111w oo000mmm disp
+        opcode = mot.get_opcode(type);
+        d = "";
+        w = "0";
+        if (!is_8(operand2))
+            w = "1";
+        oo = "11";
+        rrr = "000";
+        mmm = reg.get_reg_value(operand2);
+
+        generate_code(opcode, d, w, oo, rrr, mmm);
+    }
+
+    void add(string type, string operand1, string operand2)
+    {
+        // Opcode - 000000dw oorrrmmm disp
+        opcode = mot.get_opcode(type);
+        d = "1";
+        w = "0";
+        if (!is_8(operand1))
+            w = "1";
+        oo = "11";
+        rrr = reg.get_reg_value(operand1);
+        mmm = reg.get_reg_value(operand2);
+
+        generate_code(opcode, d, w, oo, rrr, mmm);
+
+    }
+
+    void cmp(string type, string operand1, string operand2)
+    {
+        // Opcode - 001110dw disp
+        opcode = mot.get_opcode(type);
+        d = "1";
+        w = "0";
+        if (!is_8(operand1))
+            w = "1";
+        oo = "11";
+        rrr = reg.get_reg_value(operand1);
+        mmm = reg.get_reg_value(operand2);
+
+        generate_code(opcode, d, w, oo, rrr, mmm);
+    }
+
+    void cmp_reg_imm(string type, string operand1, string operand2)
+    {
+        // Opcode - 100000sw disp
+        opcode = mot.get_opcode(type);
+        d = "0";
+        w = "0";
+        if (!is_8(operand1))
+        {
+            w = "1";
+            //Padding data for 2 bytes
+            operand2 = padd_data_upto(operand2);
+        }
+        oo = "11";
+        rrr = "111";
+        mmm = reg.get_reg_value(operand1);
+        imm_data = operand2;
+
+        generate_code(opcode, d, w, oo, rrr, mmm, imm_data);
+    }
+
+    void cmp_acc_imm(string type, string operand1, string operand2)
+    {
+        // opcode - 0001111w data
+        opcode = mot.get_opcode(type);
+        d = "", oo = "", rrr = "", mmm = "";
+        w = "0";
+        if (!is_8(operand1))
+        {
+            w = "1";
+            operand2 = padd_data_upto(operand2);
+        }
+        imm_data = operand2;
+
+        generate_code(opcode, d, w , oo , rrr, mmm, imm_data);
+
+    }
 
     void put_code(string filename="a.com")
     {
@@ -616,6 +784,22 @@ public:
         }
         obj_file.close();
     }
+
+    void and_(string type, string operand1, string operand2)
+    {
+        // Opcode - 001000dw disp
+        opcode = mot.get_opcode(type);
+        d = "1";
+        w = "0";
+        if (!is_8(operand1))
+            w = "1";
+        oo = "11";
+        rrr = reg.get_reg_value(operand1);
+        mmm = reg.get_reg_value(operand2);
+
+        generate_code(opcode, d, w, oo, rrr, mmm);
+    }
+
     void lea(string type, string operand1, string operand2)
     {
         // Opcode - 10001101 oorrrmmm disp
@@ -817,8 +1001,22 @@ public:
             lea(type, operand1, operand2);
         else if (type == "jmp")
             jmp(type, operand1, operand2);
+        else if (type == "add_reg_reg")
+            add(type, operand1, operand2);
+        else if (type == "and")
+            and_(type, operand1, operand2);
+        else if (type == "cmp_reg_reg")
+            cmp(type, operand1, operand2);
+        else if (type == "cmp_reg_imm8" || type == "cmp_reg_imm16")
+            cmp_reg_imm(type, operand1, operand2);
+        else if (type == "cmp_acc_imm8" || type == "cmp_acc_imm16")
+            cmp_acc_imm(type, operand1, operand2);
+        else if (type == "jz" || type == "je" || type == "jne" || type =="jnz")
+            jmp(type, operand1, operand2);
+        else if (type == "inc")
+            inc(type, operand1, operand2);
         else
-            err_exit("Instructions: Can't map instructions");
+            err.prnt_err("Instructions: Can't generate code for this instruction as no function available for it.");
     }
 
 } gen;
@@ -833,7 +1031,7 @@ void parse_line(const string line, int pass = 1)
     regex re("dw|db");
     regex re_blank("^\\s*$");
     regex re_label("^\\s*([a-zA-Z0-9]+:)\\s*$");
-    regex re_ins("^\\s*([a-zA-Z0-9]+:)?\\s*([a-z]{3})\\s+([a-z]+,)?\\s*((')?[a-zA-Z0-9]+(')?|[0-9]+)?\\s*$");
+    regex re_ins("^\\s*([a-zA-Z0-9]+:)?\\s*([a-z]{2,3})\\s+([a-z]+,)?\\s*((')?[a-zA-Z0-9]+(')?|[0-9]+)?\\s*$");
     regex re_pot("^\\s*([a-zA-Z0-9]+)\\s*(db|dw)\\s*((\"|\')?([a-zA-Z0-9 $]+)(\"|\')?)\\s*");
 
     smatch match;
@@ -859,7 +1057,6 @@ void parse_line(const string line, int pass = 1)
             // Matched a Pseudo Directive
             if (regex_search(line, match, re_pot))
             {
-                err.set_line(line);
                 if (DEBUG)
                     cout<<"\nLabel - "<<match[1]<<"\tdatatype - "<<match[2]<<" and initializer - "<<match[3];
                 if (pass == 1)
@@ -880,7 +1077,6 @@ void parse_line(const string line, int pass = 1)
         {
             if (regex_search(line, match, re_ins))
             {
-                err.set_line(line);
                 label = match[1];
                 mnemonic = match[2];
                 operand1 = match[3];
@@ -932,6 +1128,7 @@ int pass_1(string filename)
             if (line == "\n" || line == "")
                 continue;
             line = line+"\n";
+            err.set_line(line);
             parse_line(line);
         }
     }
@@ -941,6 +1138,9 @@ int pass_1(string filename)
 
 void pass_2(string filename)
 {
+    if (DEBUG)
+        sym.display();
+
     LC = 0x0100;
     string line;
     //Removing the previous file if it exist.
@@ -959,13 +1159,14 @@ void pass_2(string filename)
             if (line == "\n" || line ==" " || line=="")
                 continue;
             line += "\n";
+            err.set_line(line);
             parse_line(line, 2);
         }
     }
     asm_file.close();
 }
 
-int main(int argc, int **argv)
+int main(int argc, char **argv)
 {
     pass_1("a.asm");
     pass_2("a.asm");
